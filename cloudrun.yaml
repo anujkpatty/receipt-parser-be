@@ -1,0 +1,29 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: receipt-parser
+spec:
+  template:
+    spec:
+      containers:
+        - image: us-central1-docker.pkg.dev/calm-path-469813-h9/receipt-parser/receipt-parser:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: GEMINI_API_KEY
+                  key: latest
+            - name: VISION_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: VISION_ENDPOINT
+                  key: latest
+            - name: VISION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: VISION_KEY
+                  key: latest
+            - name: ALLOWED_ORIGINS
+              value: https://receipt-parser-fe.pages.dev

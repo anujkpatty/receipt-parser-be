@@ -1,0 +1,8 @@
+flask
+flask-cors
+flask-limiter
+pillow
+pydantic
+google-generativeai
+azure-ai-vision-imageanalysis
+gunicorn

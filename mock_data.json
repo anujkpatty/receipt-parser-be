@@ -1,0 +1,71 @@
+{
+  "store_name": "Bistro So",
+  "store_address": "530 Driggs Ave Front Brooklyn, NY 11211",
+  "store_number": null,
+  "items": [
+    {
+      "name": "Mezcal Madre",
+      "price": 17.0
+    },
+    {
+      "name": "Cosmopolitan-***",
+      "price": 22.0
+    },
+    {
+      "name": "Espresso Martini HH",
+      "price": 6.0
+    },
+    {
+      "name": "Espresso Martini HH",
+      "price": 6.0
+    },
+    {
+      "name": "+ $1.00: Tequila -...",
+      "price": 4.0
+    },
+    {
+      "name": "Ginger Ale",
+      "price": 5.0
+    },
+    {
+      "name": "Onions Soup",
+      "price": 15.0
+    },
+    {
+      "name": "Bistro Burger",
+      "price": 25.0
+    },
+    {
+      "name": "Bistro Burger",
+      "price": 26.0
+    },
+    {
+      "name": "Grilled Salmon",
+      "price": 32.0
+    },
+    {
+      "name": "Grilled Salmon",
+      "price": 32.0
+    },
+    {
+      "name": "Mezcal Madre",
+      "price": 13.0
+    },
+    {
+      "name": "Mezcal Madre",
+      "price": 13.0
+    },
+    {
+      "name": "HH Prosecco",
+      "price": 11.0
+    },
+    {
+      "name": "Sancerre",
+      "price": 17.0
+    }
+  ],
+  "tax": 21.12,
+  "total": 259.12,
+  "date": "2024-12-31",
+  "payment_method": "credit"
+}

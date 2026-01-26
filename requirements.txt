@@ -3,6 +3,6 @@ flask-cors
 flask-limiter
 pillow
 pydantic
-google-generativeai
+google-genai
 azure-ai-vision-imageanalysis
 gunicorn

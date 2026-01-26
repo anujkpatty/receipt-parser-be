@@ -4,7 +4,7 @@ from flask_limiter import Limiter
 from PIL import Image
 from pydantic import BaseModel, Field, ValidationError
 from typing import Literal, Optional, List
-import google.generativeai as genai
+from google import genai
 import re
 import json
 import os
@@ -32,8 +32,7 @@ class ReceiptSummary(BaseModel):
     payment_method: Literal["cash", "credit", "debit", "check", "other"]
 
 # === Configure Gemini ===
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-model = genai.GenerativeModel("gemini-2.5-flash")
+client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
 # === Flask App ===
 app = Flask(__name__)
@@ -128,7 +127,10 @@ def parse_receipt():
                     Parsed receipt text: {ocr_text}
                 '''
 
-        response = model.generate_content([prompt])
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
         print(response.text)
         content = response.text.strip()
 

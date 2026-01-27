@@ -21,6 +21,18 @@ Key design goals:
 - Treat AI output as untrusted input.
 - Enforce schema correctness and fail fast on invalid data.
 
+## Usage
+
+1. Upload receipt to get individual items
+
+<img src="screenshots/sc1.png" alt="Architecture" height="500px">
+<img src="screenshots/sc2.png" alt="Architecture" height="500px">
+
+2. Select items to create groups
+
+<img src="screenshots/sc3.png" alt="Architecture" height="500px">
+<img src="screenshots/sc4.png" alt="Architecture" height="500px">
+
 ## Architecture
 
 ```

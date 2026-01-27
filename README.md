@@ -7,6 +7,9 @@ schema before returning structured receipt data via a REST API.
 This project focuses on data pipelines, validation, and backend service design,
 with a lightweight frontend used only for upload and review.
 
+## Live link (find front-end repo [Here](https://github.com/anujkpatty/receipt-parser-fe))
+https://receipt-parser-fe.pages.dev/
+
 ## Overview
 
 The service accepts an image of a receipt, preprocesses it for readability,

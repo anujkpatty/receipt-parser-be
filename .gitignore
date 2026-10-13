@@ -1,1 +1,3 @@
 expenses.db
+.venv/
+keys.text

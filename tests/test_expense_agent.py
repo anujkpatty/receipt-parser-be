@@ -26,7 +26,7 @@ class FakeModels:
                 idx, name = line.strip().split(": ", 1)
                 cat = next((c for k, c in self.KEYWORDS.items() if k in name.lower()), "other")
                 out.append({"index": int(idx), "category": cat})
-            return FakeResponse(json.dumps(out))
+            return FakeResponse(json.dumps({"items": out}))
         return FakeResponse("Looks normal.")
 
 
@@ -104,11 +104,16 @@ def test_rules_are_per_user():
     assert result["flags"] == []
 
 
+def make_tools(day, rule_flags=(), raised=None):
+    raised = [] if raised is None else raised
+    tools = expense_agent.make_agent_tools("u1", 1, day, list(rule_flags), raised)
+    return {f.__name__: f for f in tools}, raised
+
+
 def test_agent_flag_tool_guards():
-    storage.save_receipt("u1", "Bar", "2026-10-13", 10, [("Beer", 10.0, "alcohol")])
-    raised = []
-    rule_flags = [{"category": "alcohol"}]
-    tools = {f.__name__: f for f in expense_agent.make_agent_tools("u1", 1, date(2026, 10, 13), rule_flags, raised)}
+    for d in ("2026-09-22", "2026-09-29", "2026-10-06", "2026-10-13"):
+        storage.save_receipt("u1", "Bar", d, 10, [("Beer", 10.0, "alcohol")])
+    tools, raised = make_tools(date(2026, 10, 13), rule_flags=[{"category": "alcohol"}])
 
     assert "error" in tools["flag_expense"]("warning", "alcohol", "dup of rule flag")
     assert "error" in tools["flag_expense"]("urgent", "food", "bad severity")
@@ -121,6 +126,25 @@ def test_agent_flag_tool_guards():
     assert len(raised) == expense_agent.MAX_AGENT_FLAGS
     assert storage.list_flags("u1")[0]["source"] == "agent"
 
-    history = tools["get_category_history"]("alcohol", 4)
-    assert history["current_week"] == 10.0
-    assert len(history["previous_weeks"]) == 4
+
+def test_history_only_counts_weeks_since_first_receipt():
+    for d in ("2026-09-29", "2026-10-06", "2026-10-13"):
+        storage.save_receipt("u1", "Bar", d, 20, [("Beer", 20.0, "alcohol")])
+    tools, _ = make_tools(date(2026, 10, 13))
+
+    history = tools["get_category_history"]("alcohol", 8)
+    assert history["weeks_of_history"] == 2
+    assert len(history["previous_weeks"]) == 2
+    assert history["average_previous_week"] == 20.0  # not diluted by untracked weeks
+    assert history["current_week"] == 20.0
+    # 2 weeks of history is below the minimum, so the agent can't flag yet.
+    assert "error" in tools["flag_expense"]("warning", "alcohol", "Spike")
+
+
+def test_history_for_first_receipt():
+    storage.save_receipt("u1", "Bar", "2026-10-13", 20, [("Beer", 20.0, "alcohol")])
+    tools, _ = make_tools(date(2026, 10, 13))
+    history = tools["get_category_history"]("alcohol", 8)
+    assert history["weeks_of_history"] == 0
+    assert history["previous_weeks"] == []
+    assert history["average_previous_week"] is None

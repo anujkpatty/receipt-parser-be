@@ -43,6 +43,9 @@ class CategorizedItem(BaseModel):
     index: int = Field(description="Index of the item in the input list")
     category: Category
 
+class CategorizedItems(BaseModel):
+    items: List[CategorizedItem]
+
 class SpendingRule(BaseModel):
     # category=None means the rule applies to total spend across all categories.
     category: Optional[Category] = None

@@ -92,6 +92,11 @@ def spend_between(user_id, start, end, category=None):
         return conn.execute(query, params).fetchone()[0]
 
 
+def first_spend_date(user_id):
+    with connect() as conn:
+        return conn.execute("SELECT MIN(date) FROM items WHERE user_id = ?", (user_id,)).fetchone()[0]
+
+
 def spend_by_category(user_id, start, end):
     with connect() as conn:
         rows = conn.execute(

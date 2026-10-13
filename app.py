@@ -2,8 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_limiter import Limiter
 from PIL import Image
-from pydantic import BaseModel, Field, ValidationError
-from typing import Literal, Optional, List
+from pydantic import ValidationError
 from google import genai
 import re
 import json
@@ -11,25 +10,9 @@ import os
 from werkzeug.middleware.proxy_fix import ProxyFix
 import io
 from ocr_module import sample_ocr_image_data
-
-# === Pydantic Models ===
-
-class Item(BaseModel):
-    name: str
-    price: Optional[float]
-
-class ReceiptSummary(BaseModel):
-    store_name: str
-    store_address: str
-    store_number: Optional[int]
-    items: List[Item]
-    tax: Optional[float]
-    total: Optional[float]
-    date: Optional[str] = Field(
-        pattern=r'\d{4}-\d{2}-\d{2}',
-        description="Date in the format YYYY-MM-DD"
-    )
-    payment_method: Literal["cash", "credit", "debit", "check", "other"]
+from models import ReceiptSummary, SpendingRule
+import expense_agent
+import storage
 
 # === Configure Gemini ===
 client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
@@ -46,8 +29,9 @@ CORS(
     app,
     resources={r"/*": {"origins": cors_origins}},
     allow_headers="*",
-    methods=["GET", "POST", "OPTIONS"],
+    methods=["GET", "POST", "DELETE", "OPTIONS"],
 )
+storage.init_db()
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
 
@@ -68,8 +52,8 @@ def add_cors_headers(response):
         response.headers["Access-Control-Allow-Origin"] = "*"
     elif origin in allowed_origins:
         response.headers["Access-Control-Allow-Origin"] = origin
-    response.headers.setdefault("Access-Control-Allow-Headers", "Content-Type, Authorization")
-    response.headers.setdefault("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    response.headers.setdefault("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-Id")
+    response.headers.setdefault("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
     return response
 
 def fix_image_orientation(image: Image.Image) -> Image.Image:
@@ -147,6 +131,103 @@ def parse_receipt():
     except Exception as e:
         print(e)
         return jsonify({"error": "Could not process image", "details": str(e)}), 500
+
+
+# === Expense Tracking Endpoints ===
+
+USER_ID_PATTERN = re.compile(r'^[A-Za-z0-9_-]{1,64}$')
+
+
+def get_user_id():
+    user_id = request.headers.get("X-User-Id", "")
+    return user_id if USER_ID_PATTERN.match(user_id) else None
+
+
+def missing_user_response():
+    return jsonify({"error": "Missing or invalid X-User-Id header."}), 400
+
+
+@app.route('/expenses/receipts', methods=['POST'])
+@limiter.limit("10 per minute")
+def track_receipt():
+    user_id = get_user_id()
+    if not user_id:
+        return missing_user_response()
+    try:
+        receipt = ReceiptSummary.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as ve:
+        return jsonify({"error": "Invalid receipt data", "details": ve.errors()}), 400
+
+    try:
+        result = expense_agent.analyze_receipt(client, user_id, receipt)
+        return jsonify(result), 201
+    except Exception as e:
+        print(e)
+        return jsonify({"error": "Could not analyze receipt", "details": str(e)}), 500
+
+
+@app.route('/expenses/summary', methods=['GET'])
+def get_expense_summary():
+    user_id = get_user_id()
+    if not user_id:
+        return missing_user_response()
+    period = request.args.get("period", "month")
+    if period not in ("day", "week", "month"):
+        return jsonify({"error": 'period must be "day", "week" or "month"'}), 400
+    start, end = expense_agent.period_window(period, expense_agent.date_cls.today())
+    by_category = storage.spend_by_category(user_id, start, end)
+    total = round(sum(row["spend"] for row in by_category), 2)
+    return jsonify({"start": start, "end": end, "total": total, "by_category": by_category}), 200
+
+
+@app.route('/expenses/rules', methods=['GET'])
+def get_rules():
+    user_id = get_user_id()
+    if not user_id:
+        return missing_user_response()
+    return jsonify(storage.list_rules(user_id)), 200
+
+
+@app.route('/expenses/rules', methods=['POST'])
+def create_rule():
+    user_id = get_user_id()
+    if not user_id:
+        return missing_user_response()
+    try:
+        rule = SpendingRule.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as ve:
+        return jsonify({"error": "Invalid rule", "details": ve.errors()}), 400
+    rule_id = storage.add_rule(user_id, rule.category, rule.period, rule.limit)
+    return jsonify({"id": rule_id, **rule.model_dump()}), 201
+
+
+@app.route('/expenses/rules/<int:rule_id>', methods=['DELETE'])
+def remove_rule(rule_id):
+    user_id = get_user_id()
+    if not user_id:
+        return missing_user_response()
+    if not storage.delete_rule(user_id, rule_id):
+        return jsonify({"error": "Rule not found"}), 404
+    return "", 204
+
+
+@app.route('/expenses/flags', methods=['GET'])
+def get_flags():
+    user_id = get_user_id()
+    if not user_id:
+        return missing_user_response()
+    include_acknowledged = request.args.get("include_acknowledged", "false").lower() == "true"
+    return jsonify(storage.list_flags(user_id, include_acknowledged)), 200
+
+
+@app.route('/expenses/flags/<int:flag_id>/acknowledge', methods=['POST'])
+def acknowledge_flag(flag_id):
+    user_id = get_user_id()
+    if not user_id:
+        return missing_user_response()
+    if not storage.acknowledge_flag(user_id, flag_id):
+        return jsonify({"error": "Flag not found"}), 404
+    return jsonify({"id": flag_id, "acknowledged": True}), 200
 
 
 @app.route('/mock', methods=['POST'])

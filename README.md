@@ -113,6 +113,42 @@ Health check endpoint.
 
 Returns static mock receipt data (used for frontend development).
 
+## Expense Tracking Agent
+
+After a user reviews a parsed receipt, the frontend can send it to
+`POST /expenses/receipts` to track it. Each request runs three steps
+(`expense_agent.py`):
+
+1. **Categorize**: Gemini sorts each item into a category (`alcohol`,
+   `beverages`, `food`, `groceries`, `household`, `personal_care`,
+   `entertainment`, `transportation`, `other`). The output is validated, and
+   anything it doesn't recognize becomes `other`.
+2. **Spending rules**: fixed checks with no LLM involved. Each rule has a
+   category (or none, meaning total spend), a period (`receipt`, `day`, `week`
+   or `month`) and a limit. A flag is raised when a receipt adds spend to a
+   bucket that ends up over its limit.
+3. **Anomaly agent**: Gemini calls read-only tools over the user's history
+   (`get_spending_summary`, `get_category_history`, `get_recent_receipts`).
+   Through `flag_expense` it can raise up to 3 flags for patterns that rules
+   don't cover, such as a spike against the user's usual weekly spend. This
+   step can fail without failing the request. Turn it off with
+   `EXPENSE_AGENT_ENABLED=false`.
+
+Data is stored in SQLite (`EXPENSES_DB_PATH`, default `expenses.db`). Every
+endpoint needs an `X-User-Id` header (letters, digits, `_` or `-`, up to 64
+characters).
+
+| Endpoint | Description |
+| --- | --- |
+| `POST /expenses/receipts` | Body: a receipt in the `/parse` format. Returns the categorized items, the flags and a short summary. |
+| `GET /expenses/summary?period=month` | Spend by category for the current `day`, `week` or `month`. |
+| `GET /expenses/rules` / `POST /expenses/rules` | List or create rules, e.g. `{"category": "alcohol", "period": "week", "limit": 75}`. |
+| `DELETE /expenses/rules/<id>` | Delete a rule. |
+| `GET /expenses/flags[?include_acknowledged=true]` | List flags. |
+| `POST /expenses/flags/<id>/acknowledge` | Dismiss a flag. |
+
+Run the tests with `pip install pytest && PYTHONPATH=. pytest tests`.
+
 ## Data Model and Validation
 
 Receipt data is validated using Pydantic models to ensure correctness:

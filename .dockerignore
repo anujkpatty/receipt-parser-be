@@ -6,3 +6,4 @@ __pycache__/
 processed_output.png
 test_receipt.jpeg
 mock_data.json
+expenses.db
